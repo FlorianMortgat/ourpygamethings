@@ -1,7 +1,14 @@
 #!/usr/bin/python2
 # -*- coding: utf-8 -*-
-import pygame, sys, os, time, random, math
+import pygame
+import sys
+import os
+import time
+import random
+import math
 from pygame.locals import *
+import re
+
 #sttings before pgame starts up:
 pygame.init()
 
@@ -39,7 +46,8 @@ class Platform():
             self.deltay = -self.deltay
 
 class Player():
-    def __init__(self, height, size, jump_impulse, speed, color, movement_type): #movemet type = arrows/wasd/numpad
+    def __init__(self, name, height, size, jump_impulse, speed, color, movement_type): #movemet type = arrows/wasd/numpad
+        self.name = name
         self.height = height
         self.size = float(size)
         self.jump_impulse = float(jump_impulse)
@@ -71,9 +79,9 @@ class Player():
 
 class Button:
     '''
-    A clickable button
+    A clickable/hoverable button
     '''
-    def __init__(self, text, pos, action):
+    def __init__(self, text, pos, action, action_arg = None):
         self.text = text
         self.rendered_text = font1.render(self.text, 0, pygame.Color('#ffffff'))
         self.rect = self.rendered_text.get_rect()
@@ -81,18 +89,24 @@ class Button:
         self.pos = pos
         self.rect = self.rect.move(pos)
         self.action = action
-        self.action_arg = text
+        self.action_arg = action_arg
+        if self.action_arg is None:
+            self.action_arg = text
     def show(self):
+        '''Display the button on the main window'''
         pygame.draw.rect(win, pygame.Color(0,0,0), self.rect)
         win.blit(self.rendered_text, self.rect)
     def checkHovered(self, event):
+        '''Will run self.action if the mouse hovers over the button.'''
         if (event.type == pygame.MOUSEMOTION and self.rect.collidepoint(event.pos)):
             self.action(self, self.action_arg)
     def checkClicked(self, event):
+        '''Will run self.action if a click has been registered inside the button'''
         if (event.type == pygame.MOUSEBUTTONUP and event.button == 1):
             if self.rect.collidepoint(event.pos):
                 self.action(self, self.action_arg)
     def setText(self, new_text):
+        '''Change the displayed text of the button'''
         self.text = new_text
         self.rendered_text = font1.render(self.text, 0, pygame.Color('#ffffff'))
         self.rect = self.rendered_text.get_rect()
@@ -102,87 +116,111 @@ class Button:
 
 def main():
     players = []
-    players.append(Player(6, 10, 1, 1, "#660066", 'arrows'))
-    setupControl(players[0])
-
-# this should be a class (would be easier because it needs to have a state)
+    assigned_keys = set()
+    players.append(Player('1', 6, 10, 1, 1, "#660066", 'arrows'))
+    players.append(Player('2', 6, 10, 1, 1, "#660066", 'arrows'))
+    for player in players:
+        if not setupControl(player, assigned_keys):
+            return
+        print 'Controls for Player {}:'
 
 class ControlSettings:
+    '''This class will replace the setupControl() function (it will be cleaner as a class)'''
     def __init__(self):
         pass
     def setupControls(self, player):
         pass
 
-class O: ''
+class O:
+    '''An empty class to create schema-less objects'''
 
-def setupControl(player):
+def setupControl(player, blocked_keys):
     '''
     Will allow a player to setup a keyboard key for a control
     :param player: A Player instance
-    :return:
+    :return: False if we should exit the game, True if we can continue
     '''
     this = O()
     this.action = 'noaction'
     this.button = None
+    this.next_step = False
+    setupText = font2.render('Setup controls for player {}'.format(player.name), 1, (255, 0, 0))
+    this.timerKeyAlreadyUsed = 0
+    maxTimerKeyAlreadyUsed = 10
+
     def setCurrentControl(button, control): # if it were a class, this ugly function would be a beautiful method :D
-        print('current control becomes {}'.format(control))
+        '''This is the function that gets called when one of the hover buttons is hovered'''
         this.action = control
         this.button = button
 
-    loop1 = True
+    def onBtnOK(button, arg):
+        '''This is the function that gets called when the OK button is clicked'''
+        this.next_step = True # we clicked on the button = we want to go to the next step
+
+        # but… if one of the "controls" buttons has a non-number text on it, it means
+        # the player hasn't chosen a key yet, so we can't go to the next step.
+        for hover_button in hover_buttons:
+            if not re.match('\d+', hover_button.text):
+                this.next_step = False
+                return
 
     k = 0;
     text = {}
-    buttons = [
+    hover_buttons = [
         Button('up',    (182, 220), setCurrentControl),
         Button('down',  (182, 250), setCurrentControl),
         Button('left',  (122, 250), setCurrentControl),
         Button('right', (242, 250), setCurrentControl),
     ]
-    while loop1:
-        win.fill((0,100,50))
+    click_buttons = [
+        Button('OK',    (500, 460), onBtnOK),
+    ]
+    all_buttons = hover_buttons + click_buttons
+
+    while not this.next_step:
+        win.fill((0, 100, 50))
         if this.action in player.controls:
-            txt = '{}: {}'.format(this.action, player.controls[this.action])
+            currentControlText = 'Setup player {}... {} = {}'.format(player.name, this.action, player.controls[this.action])
         else:
-            txt = ''
-        win.blit(font2.render(txt, 1, (255,0,0)), (0,0))
+            currentControlText = ''
+        win.blit(setupText, (0, 0))
+        win.blit(font2.render(currentControlText, 1, (255, 0, 0)), (0, 30))
+        if this.timerKeyAlreadyUsed:
+            keyAlreadyUsed = font1.render('KEY ALREADY IN USE', 1, (int(this.timerKeyAlreadyUsed * 255 / maxTimerKeyAlreadyUsed), 0, 0))
+            win.blit(keyAlreadyUsed, (0, 60))
 
-        for button in buttons:
+        for button in all_buttons:
             button.show()
-
-        # when i test it it just goes right into the game though
-        # because no one calls setupControl() in the main thread
-        #key_up_input    = pygame.draw.rect(win, ((255,0,0)), (162, 250), (75, 75))
-        #key_down_input  = pygame.draw.rect(win, ((255,0,0)), (325, 250), (75, 75))
-        #key_left_input  = pygame.draw.rect(win, ((255,0,0)), (487, 250), (75, 75))
-        #key_right_input = pygame.draw.rect(win, ((255,0,0)), (650, 250), (75, 75))
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                loop1 = False
+                return False
             elif event.type == pygame.KEYDOWN:
-                k = event.key
                 # we map the key to the action for that player
                 if (this.action in player.actions):
+                    if event.key in blocked_keys:
+                        this.timerKeyAlreadyUsed = maxTimerKeyAlreadyUsed
+                        continue
+                    if player.controls[this.action]:
+                        # the old key is now free, we unblock it
+                        blocked_keys.remove(player.controls[this.action])
                     player.controls[this.action] = event.key
+                    # the new key is now blocked
+                    blocked_keys.add(event.key)
                     if this.button is not None:
                         this.button.setText(str(event.key))
             elif event.type == pygame.MOUSEMOTION:
-                mouse_pos = event.pos
-                for button in buttons:
+                for button in hover_buttons:
                     button.checkHovered(event)
-                #if mouse_pos.collidepoint(key_up_input):
-                #    for k in event.key:
-                #        'What is this supposed to do?'
-                        #text[key_up_input] = font1.render(str(k))
-                        #text[key_up_input].blit(win, (162.5, 250))
             elif event.type == pygame.MOUSEBUTTONUP:
-                for button in buttons:
+                for button in click_buttons:
                     button.checkClicked(event)
 
+        this.timerKeyAlreadyUsed = max(0, this.timerKeyAlreadyUsed - 1)
 
         pygame.display.update()
         time.sleep(0.1)
+    return True
 
 if __name__ == '__main__':
     main()
