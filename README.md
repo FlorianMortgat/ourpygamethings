@@ -1,2 +1,2 @@
 # ourpygamethings
-Some pygame things that might turn into a game
+Some pygame things Scooter and I are making. Some day, it might turn into a game.
