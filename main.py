@@ -122,7 +122,8 @@ def main():
     for player in players:
         if not setupControl(player, assigned_keys):
             return
-        print 'Controls for Player {}:'
+        print 'Controls for Player {}:'.format(player.name)
+        print '\n'.join('{} = {}'.format(action, key) for action, key in player.controls.items()) + '\n'
 
 class ControlSettings:
     '''This class will replace the setupControl() function (it will be cleaner as a class)'''
